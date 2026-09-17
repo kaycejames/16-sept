@@ -1,0 +1,98 @@
+# Final Expense AI Calling System — Handoff Summary
+
+Paste this at the start of a new chat to bring Claude up to speed.
+
+---
+
+## What I'm building
+
+An AI cold-calling system for a Final Expense (burial life insurance) campaign in the US, plus the CRM around it. An AI bot dials leads, qualifies them, and transfers live calls to a human verifier, who then hands off to a licensed agent who closes the sale.
+
+I'm a small business owner, not an engineer. I use Claude Code in VS Code on my office Windows PC to build, and I speak Roman Urdu. Please reply in Roman Urdu.
+
+## The shape of the system
+
+1. **Retell AI** (cloud) — holds the voice agent "Sarah" and places the calls. Agent ID `agent_1106515681f404064d0d5c008e`. Single-prompt agent, Kate voice, GPT-4.1, voicemail detection on with hang-up, `end_call` and `transfer_call` configured.
+2. **My app** — a local web app doing everything else: leads, compliance, dialer scheduler, webhook receiver, CRM, verifier and closer workspaces, recordings, analytics. Node + Fastify + React + SQLite, encrypted PII. Runs on `localhost:5180`.
+3. **The people** — verifiers take the bot's transfers; licensed agents (closers) take the verifier's handoffs and record the outcome.
+
+The dialer was originally a separate Python project at `E:\Agent`. It has been fully rebuilt inside the app in TypeScript and retired.
+
+## Where the code lives
+
+- Office Windows PC: `E:\final-expense-app` — this is where Claude Code builds. Restart with `npm run restart`.
+- MacBook: runs the app as the office LAN server. Code moves PC → Mac as a zip.
+- Claude Code only runs on the office PC. The Mac just runs the app.
+
+## What is built and working
+
+Leads (import, batches, multi-batch selection, outcome filters, scoped export), compliance (federal DNC, internal DNC, per-state calling hours, an unbypassable `scrub()` gate), the dialer (scheduler, caller ID rotation with health tracking, daypart-rotating retry ladder, paused by default after every restart), the webhook (signature-verified, idempotent, out-of-order safe), the verifier workspace (16-question checklist, AI pre-fill kept separate from confirmed answers), the closer workspace (My Queue with a Take-this-call button, atomic claim lock, appointed-states enforcement, floor-wide banner, waiting-age badges, auto-release after a 3-minute disconnect grace period), sessions scoped per user with admin-only day/week/month filters, the dashboard, four analytics features (contact rate by hour in the lead's timezone, caller ID health, speed to lead, CPA by vendor), server-side recordings in dated folders, live websocket updates that never clear a form being typed in, and a lamp-and-pull-cord login page.
+
+Recently added: recording consent by state (item 1) and data retention with split windows, legal holds, a purge log and a per-customer file (item 2). Schema is at v20.
+
+## Audit already done
+
+A seven-pass pre-launch audit found and fixed 7 blockers, 16 serious and 7 minor issues. `docs/PRE_LAUNCH.md` holds the record and the go-live checklist. The worst finding: the app had two canonical phone formats and didn't know it, so one person could become two un-matchable records — dangerous for a DNC-sensitive business. A later pass found `sessions:get` was returning any session to any authenticated caller by sequential id, with the export built on that same read.
+
+## Decisions already made — please don't reverse these without asking
+
+- Re-pooling leads **grants** extra attempts, never resets `attempts_count` — that count is a compliance record of how many times a real person was telephoned.
+- Campaign tiles count every source; only the funnel is scoped to dialer-originated calls.
+- Rates are never computed from samples too small to mean anything; users are compared against the team median, never ranked best/worst.
+- Nothing bypasses `scrub()` — no bulk action, no callback, no manual dial.
+- Caller IDs live in their own table so a number can be retired without losing its history.
+- Recording filenames use the last four digits of the phone, not the full number.
+- Depth over coverage on compliance work — a thin version is worse than none, because I would trust something that hadn't earned it.
+- Every prompt to Claude Code must end with an instruction to test and verify in the real browser and reconcile on-screen numbers against the database.
+
+## Open bug — unresolved, with evidence
+
+Clicking the **Weekends toggle** in Retell Campaign → Retry schedule blanks the entire page.
+
+What we established over several rounds of instrumentation:
+- Confirmed on the current instrumented bundle, so it is not a stale build.
+- Console is empty of errors. Network is all 200. Not a renderer crash — the console still accepts input afterwards.
+- No navigation, no reload, no `#root` unmount.
+- The decisive console output: `[FEA] removed ['DIV#.stack gap-5'] from MAIN`, attributed to React's own commit phase, with roughly ten alternating `ls`/`hh` frames in the stack.
+- So React re-rendered and produced nothing for the main content area — a render returning null or empty for the page body, not an error.
+
+I have a prompt ready with that evidence, to be given after the current queue finishes. Claude Code has agreed that if it cannot find the cause, it will remove the Weekends toggle and default `allowWeekend: false`, since weekend calling needs legal review before I would use it anyway.
+
+I will not be connecting the Chrome extension, so Claude Code cannot click things itself — it must work from code and from observations I relay.
+
+## Work queue in progress
+
+A final pre-live queue of seven items. Item 1 (recording consent by state) and item 2 (retention) are done. Agreed order for the rest: 5 (TCPA litigator scrub), 3 (licence expiry), 4 (transfer failure handling), 6 (webhook URL stability, automatic backups, auto-restart after reboot, Retell credit/credential warnings, placeholder text), 7 (final verification pass and rewriting `PRE_LAUNCH.md` section 3 as the go-live checklist).
+
+## Still outstanding
+
+**Needs code:**
+- The open weekend-toggle bug above.
+- Git is still not installed on the PC, so commits have been waiting for several sessions and uncommitted work is accumulating. Install from git-scm.com.
+- `/api/health` returns 200 even when the UI is 404ing — the health check should assert the UI is served too.
+- Recording the human legs of the call. Only the bot leg is recorded today. Plan: try Retell/Twilio recording the full call after transfer once a real number exists; a softphone is the fallback. VICIdial is **not** needed — the app scales to 5+ agents fine because the bot does the dialing.
+
+**Needs me (blocking go-live):**
+- Replace the 37 placeholder questions, 14 scripts and 8 objections with my agency's real approved script.
+- Set appointed states on every licensed agent — without them the queue silently shows nothing (this has confused me twice already).
+- Passwords on all accounts.
+- DNC registry account and list (telemarketing.donotcall.gov).
+- Lead vendor consent proof and an attribution-window agreement.
+- Attorney review of calling hours and recording consent wording.
+- Buy a Retell number (~$2/month), link it to the agent, set the transfer number, configure a stable webhook URL (ngrok changes on every restart; Cloudflare Tunnel is the likely fix).
+- Fill in the AI cost per minute and per-vendor lead costs.
+- First real calls must be to numbers I own, never a customer list.
+
+## Open problem — LAN access
+
+My other laptops on the same WiFi cannot open the app from the Mac, even with `HOST=0.0.0.0` set. Not yet diagnosed — likely the macOS firewall, the `.local` hostname failing from Windows, or router client isolation. I have a diagnostic prompt ready to work through on the Mac.
+
+## Economics, for context
+
+Roughly $0.08–0.15 per connected minute all-in. At 50 calls/day that's about $5–6/day; at 300 calls/day about $30–35/day. One approved policy typically pays $500–1,000 commission, so calling cost is small relative to a single sale.
+
+A cheaper VoIP vendor quoted me a much lower per-minute rate. I was advised to stay on Twilio/Retell initially — cheap routes risk poor audio, dropped calls, and C-level STIR/SHAKEN attestation, which gets caller IDs marked "Spam Likely". Answer rate matters far more than a fraction of a cent per minute at my volume. Revisit at 500+ calls/day.
+
+## Legal framing I've already been told
+
+AI-voice calls fall under the TCPA's rules for artificial/prerecorded voices, so they need prior express written consent for cell numbers, and consent given to a lead generator generally doesn't transfer to me. Purchased and aged lists are the risky case. I need documented consent per lead, monthly DNC refreshes, and an attorney's review before running a real campaign. Claude is not my lawyer and should keep saying so.
