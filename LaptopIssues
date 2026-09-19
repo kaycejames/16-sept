@@ -1,4 +1,146 @@
-Current Windows server diagnostics:
+Bilkul. Monday ko **Office PC par Claude Code** ko yeh single master prompt de dein. Ismein GitHub setup, Personal Windows ko server banana, LAN access, database separation, aur future deployment workflow sab cover hai.
+
+Hum ab project architecture permanently change kar rahe hain. Please is prompt ko complete task specification samjho.
+
+## NEW PERMANENT ARCHITECTURE
+
+MacBook/server workflow completely RETIRED hai. MacBook ko ab is project ke workflow mein use nahi karna.
+
+Ab:
+
+1. OFFICE WINDOWS PC
+
+   * Development machine hai.
+   * Claude Code yahin run hota hai.
+   * Main yahin code changes karunga.
+   * Development/testing database yahin separate rahega.
+
+2. GITHUB
+
+   * Source code ka single source of truth hoga.
+   * Office PC se tested code GitHub par push hoga.
+   * GitHub PRIVATE repository honi chahiye.
+   * Production database, customer data, recordings aur secrets GitHub mein nahi jayenge.
+
+3. PERSONAL WINDOWS LAPTOP
+
+   * Ye ab permanent production/LAN server hai.
+   * Project yahan `D:\final-expense-app` mein hai.
+   * Is laptop par LOCAL SQLite database rahega.
+   * Abhi database mein sirf testing data hai.
+   * Is laptop par app run hogi.
+   * Same LAN/Wi-Fi ke 8–10 laptops browser se app access karenge.
+   * Current LAN IPv4: `10.120.19.237`
+   * Current app port: `5180`
+   * Desired browser URL:
+     `http://10.120.19.237:5180`
+
+4. OTHER OFFICE LAPTOPS
+
+   * Browser se Personal Windows server ko access karenge.
+   * In machines par project ka local copy/server install karne ki zarurat nahi.
+   * They should use:
+     `http://10.120.19.237:5180`
+
+## IMPORTANT DATABASE RULE
+
+Personal Windows laptop ka SQLite database LOCAL production/server database hai.
+
+The database file itself MUST NOT be committed to GitHub.
+
+Normal `git pull` se server ka existing local database overwrite/delete/reset nahi hona chahiye.
+
+Similarly, recordings, uploaded customer files, runtime files and other production data must remain local to the Personal Windows server.
+
+Office PC ka development database separate rahe.
+
+GitHub mein:
+
+* source code
+* migrations
+* package configuration
+* safe configuration templates
+* documentation
+
+GitHub mein NAHI:
+
+* SQLite database files
+* customer/lead PII
+* recordings
+* uploads containing customer data
+* DNC data
+* `.env` containing real secrets
+* Retell API keys
+* passwords
+* encryption keys
+* session secrets
+* private credentials
+* logs containing sensitive data
+* node_modules
+* generated runtime/build artifacts where inappropriate
+
+If the current repository contains any of these, DO NOT blindly `git add .`.
+
+First inspect and report them.
+
+## PART 1 — INSPECT CURRENT PROJECT
+
+Before changing anything:
+
+1. Inspect `D:\final-expense-app`.
+2. Inspect `package.json`.
+3. Inspect existing scripts.
+4. Inspect server startup code.
+5. Inspect Fastify host/port binding.
+6. Inspect WebSocket configuration.
+7. Inspect React frontend configuration.
+8. Inspect SQLite/database location.
+9. Inspect migrations/schema system.
+10. Inspect recordings/runtime directories.
+11. Inspect `.env` files.
+12. Check whether Git is installed.
+13. Check whether `.git` already exists.
+14. Check whether a GitHub remote already exists.
+15. Check current Git status.
+
+DO NOT make unrelated application changes.
+
+First report what you found.
+
+## PART 2 — GIT/GITHUB SAFETY
+
+If Git is not installed on this Office PC, tell me to install Git for Windows from the official Git website and then continue.
+
+If Git is already installed, use it.
+
+Set up the project as a Git repository if necessary.
+
+Create/update `.gitignore`.
+
+Before the first commit, show me exactly what files would be committed.
+
+Do NOT push until you have verified that no:
+
+* secrets
+* database files
+* recordings
+* customer PII
+* credentials
+* runtime data
+
+are included.
+
+Create/update `.env.example` with variable NAMES only. Never put real secret values in `.env.example`.
+
+Use a PRIVATE GitHub repository.
+
+If a GitHub repository already exists, inspect the existing remote before creating another one.
+
+Do not delete existing work.
+
+## PART 3 — SERVER CONFIGURATION
+
+The Personal Windows laptop currently shows:
 
 Wi-Fi IPv4:
 `10.120.19.237`
@@ -9,61 +151,306 @@ Subnet:
 Gateway:
 `10.120.19.32`
 
-Current port:
-`5180`
+Current `netstat` showed:
 
-Current `netstat -ano | findstr :5180` shows:
+`TCP 127.0.0.1:5180 ... LISTENING`
 
-`TCP 127.0.0.1:5180  0.0.0.0:0  LISTENING  8204`
+This means the app is currently listening only on localhost.
 
-Therefore the app is currently bound only to localhost and is NOT LAN-accessible.
-
-I need this Windows laptop to become the LAN server for the Final Expense app.
-
-Please inspect the existing code and make the MINIMUM safe change necessary so the Fastify server listens on:
+The production/LAN server must listen on:
 
 `0.0.0.0:5180`
 
-Do NOT rewrite the app or change business logic.
+Do this using the project's existing configuration architecture.
 
-Also inspect the WebSocket/server configuration and make sure LAN browser clients can establish the existing WebSocket connection without weakening authentication or session isolation.
+Prefer:
 
-Important:
+`HOST=0.0.0.0`
 
-* Preserve port 5180.
-* Preserve all existing authentication/session behavior.
-* Do not expose the app to the public internet.
-* Do not add router port forwarding.
-* Do not change Retell's public webhook configuration.
-* Do not disable any security/compliance controls.
-* Do not hard-code `10.120.19.237` into the application because the LAN IP may later change.
-* Prefer an environment variable/configuration such as HOST=0.0.0.0 if the existing architecture supports it.
+or the equivalent configuration.
 
-After making the change:
+DO NOT hard-code `10.120.19.237` into the application.
 
-1. Restart the app.
-2. Run:
-   `netstat -ano | findstr :5180`
-3. Confirm that LISTENING is now on:
-   `0.0.0.0:5180`
-   or an equivalent LAN-accessible binding.
-4. Test in the real browser on the server laptop:
-   `http://localhost:5180`
-5. Test in the real browser on the server laptop:
-   `http://10.120.19.237:5180`
-6. Verify login page and app functionality.
-7. Verify WebSocket/live updates still initialize.
-8. Do not claim LAN access is complete until the actual browser test succeeds.
+The server should remain configurable because the LAN IP may change.
 
-Then give me:
+Inspect and fix WebSocket binding/configuration too, so LAN clients can use the existing real-time functionality.
 
-* exact file(s) changed
-* exact configuration change
-* final netstat output
-* whether localhost works
-* whether `http://10.120.19.237:5180` works
-* whether WebSocket works
-* whether Windows Firewall is now the only remaining blocker
+Do not weaken authentication, session isolation, authorization or any compliance controls.
 
-MANDATORY:
-Test and verify in the real browser after the change. Reconcile the on-screen status/numbers against the backend/database where applicable.
+## PART 4 — LAN ACCESS
+
+The Personal Windows server should be accessible from other laptops on the same LAN through:
+
+`http://10.120.19.237:5180`
+
+Do NOT configure:
+
+* router port forwarding
+* public internet exposure
+* unnecessary external tunnels
+
+This is LAN-only at this stage.
+
+Check the Windows network profile.
+
+If a Windows Firewall rule is required, create or provide the exact Administrator PowerShell command for TCP port 5180 on the PRIVATE network profile only.
+
+Do not expose port 5180 on Public networks unnecessarily.
+
+## PART 5 — RETELL WEBHOOK
+
+DO NOT change the Retell public webhook into a LAN IP.
+
+Retell needs a stable public HTTPS endpoint separately.
+
+The LAN server architecture and Retell public webhook architecture must remain separate.
+
+Do not replace the existing Retell webhook configuration with:
+
+`http://10.120.19.237:5180`
+
+unless the actual architecture explicitly requires some internal callback — and verify before changing anything.
+
+## PART 6 — HEALTH CHECK
+
+There is a known issue:
+
+`/api/health` currently returns HTTP 200 even when the UI is unavailable/404.
+
+Inspect the current implementation.
+
+The health check should verify that the application/UI is actually being served, not merely that the API process responds.
+
+Make the minimum safe fix necessary.
+
+Do not break existing monitoring or startup behavior.
+
+## PART 7 — GITHUB WORKFLOW
+
+The permanent development workflow should be:
+
+OFFICE PC:
+
+Claude Code changes
+↓
+run tests
+↓
+real browser verification
+↓
+inspect Git diff
+↓
+git status
+↓
+git add
+↓
+git commit
+↓
+git push
+↓
+GitHub
+
+PERSONAL SERVER:
+
+git pull
+↓
+install dependencies ONLY if package/dependency files changed
+↓
+run required migrations ONLY if migrations changed
+↓
+build ONLY if required by the actual project
+↓
+restart application
+↓
+real browser verification
+
+Do NOT invent `npm` commands.
+
+Inspect `package.json` and use the actual existing project scripts.
+
+Document the exact workflow in:
+
+`docs/GIT_WORKFLOW.md`
+
+Include:
+
+* Office development workflow
+* GitHub workflow
+* Personal server deployment workflow
+* database separation
+* secrets handling
+* recordings handling
+* migration handling
+* rollback procedure
+* what must never be committed
+
+## CRITICAL DATABASE REQUIREMENT
+
+A normal:
+
+`git pull`
+
+must NEVER replace the Personal Server's local SQLite database.
+
+Do not store the production `.db` file in Git.
+
+If migrations exist, they should be version-controlled.
+
+When schema changes, the migration should be committed to GitHub.
+
+The Personal Server should apply the migration to its existing local database rather than replacing the database.
+
+Verify this against the actual project architecture instead of assuming.
+
+## PART 8 — STARTUP / RESTART
+
+Inspect how the app currently starts.
+
+I want the Personal Windows server to be able to restart the application reliably.
+
+Do NOT introduce a completely different process manager unless actually necessary.
+
+Document:
+
+* normal start
+* normal restart
+* what happens after Windows reboot
+* whether automatic startup is currently configured
+* what remains to be configured
+
+Do not silently create a Windows service or scheduled task without explaining it first.
+
+## PART 9 — BROWSER VERIFICATION
+
+After the LAN/server changes:
+
+On the Personal Windows server itself verify in the REAL browser:
+
+1. `http://localhost:5180`
+2. `http://10.120.19.237:5180`
+
+Verify:
+
+* login page
+* login
+* dashboard
+* navigation
+* API calls
+* WebSocket connection
+* live updates
+* CRM functionality
+* existing user/session isolation
+
+Then give me the exact test I must perform manually from another laptop because you cannot control that physical laptop.
+
+The manual test should be:
+
+`http://10.120.19.237:5180`
+
+Do not claim LAN access is complete until the server-side tests are successful.
+
+## PART 10 — MULTI-USER SAFETY
+
+Because 8–10 laptops may use the app simultaneously:
+
+Verify that:
+
+* sessions remain user-scoped
+* one user's browser cannot see another user's authenticated session
+* existing authorization remains intact
+* SQLite access is compatible with the current application
+* WebSocket updates do not leak data between users
+* concurrent verifier/closer operations preserve existing atomic locks
+
+Do not redesign the application unless an actual issue is found.
+
+## PART 11 — GIT COMMIT / PUSH
+
+Once everything above is safely configured:
+
+Show me:
+
+1. `git status`
+2. files that will be committed
+3. important `.gitignore` rules
+4. remote GitHub repository
+5. branch name
+6. confirmation that database/recordings/secrets are excluded
+
+Then create the initial/appropriate commit and push to the PRIVATE GitHub repository.
+
+Use a meaningful commit message.
+
+Do not force-push.
+
+Do not delete remote history.
+
+Do not overwrite unrelated existing branches.
+
+## PART 12 — FINAL REPORT
+
+At the end give me a concise report with:
+
+### Office PC
+
+* Git installed?
+* GitHub connected?
+* repository/branch
+* commit created?
+* push successful?
+
+### Personal Windows Server
+
+* project path
+* LAN IP
+* port
+* final host binding
+* exact server URL
+* database location
+* recordings location
+* `.env` location
+* startup/restart command
+
+### LAN
+
+* Windows Firewall status
+* whether server-side LAN URL works
+* exact manual test for another laptop
+
+### Database
+
+* confirm Personal Server database is local-only
+* confirm normal `git pull` will not overwrite it
+* migration mechanism
+
+### Remaining work
+
+List only actual remaining blockers.
+
+DO NOT mark something "done" just because code was changed. It must be tested.
+
+MANDATORY FINAL REQUIREMENT:
+
+Every code change must be tested and verified in the REAL BROWSER.
+
+After testing, reconcile important on-screen numbers/status against the database/backend state.
+
+If you cannot perform a physical test on another laptop, explicitly identify that as a manual test for me instead of claiming it passed.
+
+Do not make unrelated changes to the application while performing this setup.
+
+### Monday ko workflow
+
+Aap Claude ko prompt dene ke baad **usko ek saath blindly execute karne na dein**. Pehle woh inspection/report de. Agar woh bole:
+
+> "These are the files that will be committed..."
+
+to woh output yahan paste kar dena. **Main pehle check karwa dunga ke database, `.env`, recordings aur secrets accidentally GitHub mein nahi ja rahe.**
+
+Uske baad hi push karwana.
+
+Aur Monday ke baad aapka permanent model essentially yeh hoga:
+
+**Office:** Claude → Test → GitHub
+**Ghar/Server:** GitHub → Pull → Restart → LAN users
+
+Isse MacBook completely workflow se nikal jayega.
