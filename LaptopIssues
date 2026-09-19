@@ -1,0 +1,69 @@
+Current Windows server diagnostics:
+
+Wi-Fi IPv4:
+`10.120.19.237`
+
+Subnet:
+`255.255.255.0`
+
+Gateway:
+`10.120.19.32`
+
+Current port:
+`5180`
+
+Current `netstat -ano | findstr :5180` shows:
+
+`TCP 127.0.0.1:5180  0.0.0.0:0  LISTENING  8204`
+
+Therefore the app is currently bound only to localhost and is NOT LAN-accessible.
+
+I need this Windows laptop to become the LAN server for the Final Expense app.
+
+Please inspect the existing code and make the MINIMUM safe change necessary so the Fastify server listens on:
+
+`0.0.0.0:5180`
+
+Do NOT rewrite the app or change business logic.
+
+Also inspect the WebSocket/server configuration and make sure LAN browser clients can establish the existing WebSocket connection without weakening authentication or session isolation.
+
+Important:
+
+* Preserve port 5180.
+* Preserve all existing authentication/session behavior.
+* Do not expose the app to the public internet.
+* Do not add router port forwarding.
+* Do not change Retell's public webhook configuration.
+* Do not disable any security/compliance controls.
+* Do not hard-code `10.120.19.237` into the application because the LAN IP may later change.
+* Prefer an environment variable/configuration such as HOST=0.0.0.0 if the existing architecture supports it.
+
+After making the change:
+
+1. Restart the app.
+2. Run:
+   `netstat -ano | findstr :5180`
+3. Confirm that LISTENING is now on:
+   `0.0.0.0:5180`
+   or an equivalent LAN-accessible binding.
+4. Test in the real browser on the server laptop:
+   `http://localhost:5180`
+5. Test in the real browser on the server laptop:
+   `http://10.120.19.237:5180`
+6. Verify login page and app functionality.
+7. Verify WebSocket/live updates still initialize.
+8. Do not claim LAN access is complete until the actual browser test succeeds.
+
+Then give me:
+
+* exact file(s) changed
+* exact configuration change
+* final netstat output
+* whether localhost works
+* whether `http://10.120.19.237:5180` works
+* whether WebSocket works
+* whether Windows Firewall is now the only remaining blocker
+
+MANDATORY:
+Test and verify in the real browser after the change. Reconcile the on-screen status/numbers against the backend/database where applicable.
